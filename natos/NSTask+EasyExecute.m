@@ -28,7 +28,17 @@
         NSData* dataOut = nil;
         if (-1 == strLen)
         {
-            dataOut = [[otool.standardOutput fileHandleForReading] readDataToEndOfFile];
+            while (otool.isRunning)
+            {
+                NSMutableData* old = [dataOut isKindOfClass:[NSMutableData class]] ? (NSData*)dataOut : dataOut.mutableCopy;
+                dataOut = [[otool.standardOutput fileHandleForReading] readDataToEndOfFile];
+                if (old)
+                {
+                    [old appendData:dataOut];
+                    dataOut = old;
+                }
+            }
+            
         }
         else
         {
