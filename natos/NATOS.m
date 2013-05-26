@@ -64,6 +64,10 @@
             {
                 _CPUArchitecture = val;
             }
+            else if (!_loadAddress && [arg hasPrefix:@"-l"])
+            {
+                _loadAddress = val.hexValue;
+            }
         }
         
         _executionPath = [NSString stringWithUTF8String:argv[0]];
@@ -73,12 +77,12 @@
 
 - (void) printUsage
 {
-    printf("%s -c <CPU_ARCH> -m <MAIN_FUNCTION_STACK_ADDRES> -a <TARGET_STACK_ADDRES> -x <PATH_TO_XCARCHIVE>\n", _executionPath.UTF8String);
+    printf("%s -c <CPU_ARCH> [-m <MAIN_FUNCTION_STACK_ADDRES> OR -l <LOAD_ADDRESS>] -a <TARGET_STACK_ADDRES> -x <PATH_TO_XCARCHIVE>\n", _executionPath.UTF8String);
 }
 
 - (int) run
 {
-    if (!_mainFunctionStackAddress ||
+    if ((!_mainFunctionStackAddress && !_loadAddress) ||
         !_targetStackAddress ||
         !_CPUArchitecture ||
         (!_dSYMPath && !_XCArchivePath))
@@ -106,18 +110,33 @@
 {
     BOOL success = NO;
     
-    printf("Main Stack Address == 0x%x\n", self.mainFunctionStackAddress);
+    if (self.mainFunctionStackAddress)
+    {
+        printf("Main Stack Address == 0x%x\n", self.mainFunctionStackAddress);
+    }
+    else if (self.loadAddress)
+    {
+        printf("Load Address == 0x%x\n", self.loadAddress);
+    }
     printf("Target Stack Address == 0x%x\n", self.targetStackAddress);
 
     if ([self extractSlide])
     {
         printf("Slide == 0x%x\n", self.slide);
-        if ([self extractMainFunctionSymbolAddress])
+        if (self.loadAddress || [self extractMainFunctionSymbolAddress])
         {
-            printf("Main Symbol Address == 0x%x\n", self.mainFunctionSymbolAddress);
-            if ([self calculateLoadAddress])
+            if (self.mainFunctionSymbolAddress)
             {
-                printf("Load Address == 0x%x\n", self.loadAddress);
+                printf("Main Symbol Address == 0x%x\n", self.mainFunctionSymbolAddress);
+            }
+
+            if (self.loadAddress || [self calculateLoadAddress])
+            {
+                if (self.mainFunctionSymbolAddress)
+                {
+                    printf("Load Address == 0x%x\n", self.loadAddress);
+                }
+
                 if ([self calculateTargetSymbolAddress])
                 {
                     printf("Target Symbol Address == 0x%x\n", self.targetSymbolAddress);
@@ -318,9 +337,11 @@
 {
     NSString* addy = [NSString stringWithFormat:@"0x%x", self.targetSymbolAddress];
     NSString* output = nil;
+    printf("\n\n/usr/bin/dwarfdump --arch %s --lookup %s %s\n", self.CPUArchitecture.UTF8String, addy.UTF8String, self.dSYMPath.UTF8String);
     output = [NSTask executeAndReturnStdOut:@"/usr/bin/dwarfdump" arguments:@[@"--arch", self.CPUArchitecture, @"--lookup", addy, self.dSYMPath]];
     printf("\n\ndwarfdump output:\n%s\n", output.UTF8String);
-    output = [NSTask executeAndReturnStdOut:@"/usr/bin/atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, addy]];
+    printf("\n\n/Applications/Xcode.app/Contents/Developer/usr/bin/atos -arch %s -o %s %s\n", self.CPUArchitecture.UTF8String, self.dSYMPath.UTF8String, addy.UTF8String);
+    output = [NSTask executeAndReturnStdOut:@"/Applications/Xcode.app/Contents/Developer/usr/bin/atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, addy]];
     printf("\n\natos output:\n%s\n", output.UTF8String);
     return YES;
 }
