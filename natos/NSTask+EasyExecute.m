@@ -38,7 +38,6 @@
                     dataOut = old;
                 }
             }
-            
         }
         else
         {
@@ -58,7 +57,10 @@
             [data appendBytes:&z length:1];
             dataOut = data;
         }
-        NSString* output = [NSString stringWithUTF8String:(const char*)dataOut.bytes];
+        NSString* output = [[NSString alloc] initWithBytes:dataOut.bytes
+                                                    length:dataOut.length
+                                                  encoding:NSUTF8StringEncoding];
+        output = [output stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         return output;
     }
 }

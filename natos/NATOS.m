@@ -10,13 +10,20 @@
 #import "NSString+Hex.h"
 #import "NSTask+EasyExecute.h"
 
+@interface NSString (Safe)
+- (const char*) safeUTF8String;
+@end
+
+@interface NSTask (Extended)
++ (NSString*) executeXcodeTool:(NSString*)toolName arguments:(NSArray*)arguments;
+@end
+
 @interface NATOS ()
 {
 }
 
 @property (nonatomic, assign, readwrite) unsigned int mainFunctionSymbolAddress;
 @property (nonatomic, assign, readwrite) unsigned int slide;
-@property (nonatomic, assign, readwrite) unsigned int loadAddress;
 @property (nonatomic, assign, readwrite) unsigned int targetSymbolAddress;
 
 - (BOOL) extractAndPrintSymbol;
@@ -25,7 +32,7 @@
 - (BOOL) extractMainFunctionSymbolAddress;
 - (BOOL) calculateLoadAddress;
 - (BOOL) calculateTargetSymbolAddress;
-- (BOOL) printTargetSymbol;
+- (BOOL) calculateTargetSymbol;  // also prints
 
 @end
 
@@ -52,6 +59,10 @@
             {
                 _XCArchivePath = val;
             }
+            else if (!_dSYMPath && [arg hasPrefix:@"-d"])
+            {
+                _dSYMPath = val;
+            }
             else if (!_mainFunctionStackAddress && [arg hasPrefix:@"-m"])
             {
                 _mainFunctionStackAddress = val.hexValue;
@@ -77,7 +88,7 @@
 
 - (void) printUsage
 {
-    printf("%s -c <CPU_ARCH> [-m <MAIN_FUNCTION_STACK_ADDRES> OR -l <LOAD_ADDRESS>] -a <TARGET_STACK_ADDRES> -x <PATH_TO_XCARCHIVE>\n", _executionPath.UTF8String);
+    printf("%s -c <CPU_ARCH> [-m <MAIN_FUNCTION_STACK_ADDRES> OR -l <LOAD_ADDRESS>] -a <TARGET_STACK_ADDRES> [-x <PATH_TO_XCARCHIVE> OR -d <PATH_TO_DSYM>]\n", _executionPath.safeUTF8String);
 }
 
 - (int) run
@@ -93,7 +104,7 @@
     
     if (!self.dSYMPath)
     {
-        fprintf(stderr, "%s is not a viable xarchive!\n", _XCArchivePath.UTF8String);
+        fprintf(stderr, "%s is not a viable xarchive!\n", _XCArchivePath.safeUTF8String);
         return -1;
     }
     
@@ -140,7 +151,7 @@
                 if ([self calculateTargetSymbolAddress])
                 {
                     printf("Target Symbol Address == 0x%x\n", self.targetSymbolAddress);
-                    success = [self printTargetSymbol];
+                    success = [self calculateTargetSymbol];
                 }
             }
         }
@@ -213,7 +224,7 @@
     BOOL success = NO;
     
     @autoreleasepool {
-        NSString* output = [NSTask executeAndReturnStdOut:@"/usr/bin/otool" arguments:@[@"-arch", self.CPUArchitecture, @"-l", self.dSYMPath]];
+        NSString* output = [NSTask executeXcodeTool:@"otool" arguments:@[@"-arch", self.CPUArchitecture, @"-l", self.dSYMPath]];
         NSArray* lines = [output componentsSeparatedByString:@"\n"];
         NSCharacterSet* whitespace = [NSCharacterSet whitespaceAndNewlineCharacterSet];
         for (NSUInteger i = 0; i < lines.count && !success; i++)
@@ -250,7 +261,8 @@
     BOOL success = NO;
     
     @autoreleasepool {
-        NSString* output = [NSTask executeAndReturnStdOut:@"/usr/bin/dwarfdump"
+        NSString* dwarfdump = [NSTask executeAndReturnStdOut:@"/usr/bin/xcrun" arguments:@[@"-find", @"-sdk", @"iphoneos", @"dwarfdump"]];
+        NSString* output = [NSTask executeAndReturnStdOut:dwarfdump
                                                 arguments:@[@"--all", @"--arch", self.CPUArchitecture, self.dSYMPath]
                                       withMaxStringLength:1024*100];
         NSArray* lines = [output componentsSeparatedByString:@"\n"];
@@ -333,17 +345,49 @@
     return success;
 }
 
-- (BOOL) printTargetSymbol
+- (BOOL) calculateTargetSymbol
 {
     NSString* addy = [NSString stringWithFormat:@"0x%x", self.targetSymbolAddress];
+    NSString* output = [NSTask executeXcodeTool:@"dwarfdump" arguments:@[@"--arch", self.CPUArchitecture, @"--lookup", addy, self.dSYMPath]];
+    output = [NSTask executeXcodeTool:@"atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, addy]];
+    _targetSymbol = [output copy];
+    return !!_targetSymbol;
+}
+
+@end
+
+@implementation NSTask (Extended)
+
++ (NSString*) executeXcodeTool:(NSString*)toolName arguments:(NSArray*)arguments
+{
+    NSString* toolPath = [NSTask executeAndReturnStdOut:@"/usr/bin/xcrun" arguments:@[@"-find", @"-sdk", @"iphoneos", toolName]];
     NSString* output = nil;
-    printf("\n\n/usr/bin/dwarfdump --arch %s --lookup %s %s\n", self.CPUArchitecture.UTF8String, addy.UTF8String, self.dSYMPath.UTF8String);
-    output = [NSTask executeAndReturnStdOut:@"/usr/bin/dwarfdump" arguments:@[@"--arch", self.CPUArchitecture, @"--lookup", addy, self.dSYMPath]];
-    printf("\n\ndwarfdump output:\n%s\n", output.UTF8String);
-    printf("\n\n/Applications/Xcode.app/Contents/Developer/usr/bin/atos -arch %s -o %s %s\n", self.CPUArchitecture.UTF8String, self.dSYMPath.UTF8String, addy.UTF8String);
-    output = [NSTask executeAndReturnStdOut:@"/Applications/Xcode.app/Contents/Developer/usr/bin/atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, addy]];
-    printf("\n\natos output:\n%s\n", output.UTF8String);
-    return YES;
+    if (toolPath)
+    {
+        printf("\n\n");
+        printf("%s ", toolPath.safeUTF8String);
+        for (NSString* arg in arguments)
+        {
+            printf("%s ", arg.safeUTF8String);
+        }
+        printf("\n");
+        output = [NSTask executeAndReturnStdOut:toolPath arguments:arguments];
+        printf("%s\n", output.safeUTF8String);
+    }
+    else
+    {
+        printf("\n\nMissing Tool! %s\n", toolName.safeUTF8String);
+    }
+    return output;
+}
+
+@end
+
+@implementation NSString (Safe)
+
+- (const char*) safeUTF8String
+{
+    return [self cStringUsingEncoding:NSUTF8StringEncoding];
 }
 
 @end
