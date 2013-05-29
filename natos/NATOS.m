@@ -79,6 +79,10 @@
             {
                 _loadAddress = val.hexValue;
             }
+            else if (!_slide && [arg hasPrefix:@"-s"])
+            {
+                _slide = val.hexValue;
+            }
         }
         
         _executionPath = [NSString stringWithUTF8String:argv[0]];
@@ -88,7 +92,7 @@
 
 - (void) printUsage
 {
-    printf("%s -c <CPU_ARCH> [-m <MAIN_FUNCTION_STACK_ADDRES> OR -l <LOAD_ADDRESS>] -a <TARGET_STACK_ADDRES> [-x <PATH_TO_XCARCHIVE> OR -d <PATH_TO_DSYM>]\n", _executionPath.safeUTF8String);
+    printf("%s -c <CPU_ARCH> [-m <MAIN_FUNCTION_STACK_ADDRES> OR -l <LOAD_ADDRESS>] -a <TARGET_STACK_ADDRES> [-x <PATH_TO_XCARCHIVE> OR -d <PATH_TO_DSYM>] [-s <SLIDE>]\n", _executionPath.safeUTF8String);
 }
 
 - (int) run
@@ -131,7 +135,7 @@
     }
     printf("Target Stack Address == 0x%x\n", self.targetStackAddress);
 
-    if ([self extractSlide])
+    if (self.slide || [self extractSlide])
     {
         printf("Slide == 0x%x\n", self.slide);
         if (self.loadAddress || [self extractMainFunctionSymbolAddress])
@@ -148,7 +152,7 @@
                     printf("Load Address == 0x%x\n", self.loadAddress);
                 }
 
-                if ([self calculateTargetSymbolAddress])
+                /*if*/ ([self calculateTargetSymbolAddress]);
                 {
                     printf("Target Symbol Address == 0x%x\n", self.targetSymbolAddress);
                     success = [self calculateTargetSymbol];
@@ -347,9 +351,12 @@
 
 - (BOOL) calculateTargetSymbol
 {
-    NSString* addy = [NSString stringWithFormat:@"0x%x", self.targetSymbolAddress];
-    NSString* output = [NSTask executeXcodeTool:@"dwarfdump" arguments:@[@"--arch", self.CPUArchitecture, @"--lookup", addy, self.dSYMPath]];
-    output = [NSTask executeXcodeTool:@"atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, addy]];
+    NSString* addy = [NSString stringWithFormat:@"0x%x", self.targetStackAddress];
+    NSString* addy2 = [NSString stringWithFormat:@"0x%x", (self.loadAddress ? self.loadAddress : self.slide)];
+    NSString* output = [NSTask executeXcodeTool:@"atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, (self.loadAddress ? @"-l" : @"-s"), addy2, addy]];
+    NSArray* comp = [output componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    output = comp.count > 0 ? [comp lastObject] : nil;
+    output = [output stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     _targetSymbol = [output copy];
     return !!_targetSymbol;
 }
