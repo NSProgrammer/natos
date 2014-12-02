@@ -12,7 +12,7 @@
 
 + (NSString*) executeAndReturnStdOut:(NSString *)taskPath arguments:(NSArray *)args
 {
-    return [self executeAndReturnStdOut:taskPath arguments:args withMaxStringLength:-1];
+    return [self executeAndReturnStdOut:taskPath arguments:args withMaxStringLength:NSUIntegerMax];
 }
 
 + (NSString*) executeAndReturnStdOut:(NSString *)taskPath arguments:(NSArray *)args withMaxStringLength:(NSUInteger)strLen
@@ -26,11 +26,11 @@
         [otool launch];
         
         NSData* dataOut = nil;
-        if (-1 == strLen)
+        if (strLen == NSUIntegerMax)
         {
             while (otool.isRunning)
             {
-                NSMutableData* old = [dataOut isKindOfClass:[NSMutableData class]] ? (NSData*)dataOut : dataOut.mutableCopy;
+                NSMutableData *old = [dataOut isKindOfClass:[NSMutableData class]] ? (NSMutableData *)dataOut : dataOut.mutableCopy;
                 dataOut = [[otool.standardOutput fileHandleForReading] readDataToEndOfFile];
                 if (old)
                 {

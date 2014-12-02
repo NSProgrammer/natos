@@ -105,26 +105,26 @@
         [self printUsage];
         return -1;
     }
-    
+
     if (!self.dSYMPath)
     {
         fprintf(stderr, "%s is not a viable xarchive!\n", _XCArchivePath.safeUTF8String);
         return -1;
     }
-    
+
     if (![self extractAndPrintSymbol])
     {
         fprintf(stderr, "Could not load symbol address!\n");
         return -1;
     }
-    
+
     return 0;
 }
 
 - (BOOL) extractAndPrintSymbol
 {
     BOOL success = NO;
-    
+
     if (self.mainFunctionStackAddress)
     {
         printf("Main Stack Address == 0x%qx\n", self.mainFunctionStackAddress);
@@ -160,7 +160,7 @@
             }
         }
     }
-    
+
     return success;
 }
 
@@ -168,7 +168,7 @@
 {
     NSString* binary = nil;
     NSString* xcarchive = _XCArchivePath;
-    
+
     @autoreleasepool {
         BOOL isDir = NO;
         if ([[NSFileManager defaultManager] fileExistsAtPath:xcarchive isDirectory:&isDir] && isDir)
@@ -185,17 +185,17 @@
                         [possibleDSYMs addObject:[file stringByAppendingPathComponent:theFile]];
                     }
                 }
-                
+
                 file = nil;
                 if (possibleDSYMs.count > 1)
                 {
-                    file = [possibleDSYMs objectAtIndex:0];
+                    file = possibleDSYMs[0];
                 }
                 else if (possibleDSYMs.count == 1)
                 {
-                    file = [possibleDSYMs objectAtIndex:0];
+                    file = possibleDSYMs[0];
                 }
-                
+
                 if (file)
                 {
                     NSString* name = [file lastPathComponent];
@@ -213,33 +213,33 @@
             }
         }
     }
-    
+
     if (binary)
     {
         _dSYMPath = binary;
     }
-    
-    return !!binary;
+
+    return binary != nil;
 }
 
 - (BOOL) extractSlide
 {
     unsigned long long slide = 0;
     BOOL success = NO;
-    
+
     @autoreleasepool {
         NSString* output = [NSTask executeXcodeTool:@"otool" arguments:@[@"-arch", self.CPUArchitecture, @"-l", self.dSYMPath]];
         NSArray* lines = [output componentsSeparatedByString:@"\n"];
         NSCharacterSet* whitespace = [NSCharacterSet whitespaceAndNewlineCharacterSet];
         for (NSUInteger i = 0; i < lines.count && !success; i++)
         {
-            NSString* line = [[lines objectAtIndex:i] stringByTrimmingCharactersInSet:whitespace];
+            NSString* line = [lines[i] stringByTrimmingCharactersInSet:whitespace];
             if ([line isEqualToString:@"cmd LC_SEGMENT"] || [line isEqualToString:@"cmd LC_SEGMENT_64"])
             {
                 BOOL isText = NO;
                 for (NSUInteger j = 1; j+i < lines.count && j < 8 && !success; j++)
                 {
-                    line = [[lines objectAtIndex:i+j] stringByTrimmingCharactersInSet:whitespace];
+                    line = [lines[i + j] stringByTrimmingCharactersInSet:whitespace];
                     if (!isText)
                     {
                         isText = [line isEqualToString:@"segname __TEXT"];
@@ -263,7 +263,7 @@
 {
     unsigned long long main_symbol = 0;
     BOOL success = NO;
-    
+
     @autoreleasepool {
         NSString* dwarfdump = [NSTask executeAndReturnStdOut:@"/usr/bin/xcrun" arguments:@[@"-find", @"-sdk", @"iphoneos", @"dwarfdump"]];
         NSString* output = [NSTask executeAndReturnStdOut:dwarfdump
@@ -277,25 +277,25 @@
                 NSMutableArray* subvalues = [[line componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@":)-["]] mutableCopy];
                 for (NSUInteger i = 0; i < subvalues.count; i++)
                 {
-                    NSString* subvalue = [[subvalues objectAtIndex:i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    NSString* subvalue = [subvalues[i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
                     if (subvalue.length == 0)
                     {
                         [subvalues removeObjectAtIndex:i];
                         i--;
                     }
                 }
-                
+
                 if (subvalues.count > 1)
                 {
-                    main_symbol = [[subvalues objectAtIndex:1] hexValue];
+                    main_symbol = [subvalues[1] hexValue];
                     success = main_symbol > 0;
                 }
-                
+
                 break;
             }
         }
     }
-    
+
     if (success)
         self.mainFunctionSymbolAddress = main_symbol;
     return success;
@@ -358,7 +358,7 @@
     output = comp.count > 0 ? [comp lastObject] : nil;
     output = [output stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     _targetSymbol = [output copy];
-    return !!_targetSymbol;
+    return _targetSymbol != nil;
 }
 
 @end
