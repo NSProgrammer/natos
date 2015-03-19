@@ -261,14 +261,14 @@
 
 - (BOOL) extractMainFunctionSymbolAddress
 {
-    unsigned int main_symbol = 0;
+    unsigned long long main_symbol = 0;
     BOOL success = NO;
     
     @autoreleasepool {
         NSString* dwarfdump = [NSTask executeAndReturnStdOut:@"/usr/bin/xcrun" arguments:@[@"-find", @"-sdk", @"iphoneos", @"dwarfdump"]];
         NSString* output = [NSTask executeAndReturnStdOut:dwarfdump
                                                 arguments:@[@"--all", @"--arch", self.CPUArchitecture, self.dSYMPath]
-                                      withMaxStringLength:1024*100];
+                                      withMaxStringLength:1024*200];
         NSArray* lines = [output componentsSeparatedByString:@"\n"];
         for (NSString* line in lines)
         {
