@@ -22,9 +22,9 @@
 {
 }
 
-@property (nonatomic, assign, readwrite) unsigned int mainFunctionSymbolAddress;
-@property (nonatomic, assign, readwrite) unsigned int slide;
-@property (nonatomic, assign, readwrite) unsigned int targetSymbolAddress;
+@property (nonatomic, assign, readwrite) unsigned long long mainFunctionSymbolAddress;
+@property (nonatomic, assign, readwrite) unsigned long long slide;
+@property (nonatomic, assign, readwrite) unsigned long long targetSymbolAddress;
 
 - (BOOL) extractAndPrintSymbol;
 - (BOOL) deriveDSYMPath;
@@ -127,34 +127,34 @@
     
     if (self.mainFunctionStackAddress)
     {
-        printf("Main Stack Address == 0x%x\n", self.mainFunctionStackAddress);
+        printf("Main Stack Address == 0x%qx\n", self.mainFunctionStackAddress);
     }
     else if (self.loadAddress)
     {
-        printf("Load Address == 0x%x\n", self.loadAddress);
+        printf("Load Address == 0x%qx\n", self.loadAddress);
     }
-    printf("Target Stack Address == 0x%x\n", self.targetStackAddress);
+    printf("Target Stack Address == 0x%qx\n", self.targetStackAddress);
 
     if (self.slide || [self extractSlide])
     {
-        printf("Slide == 0x%x\n", self.slide);
+        printf("Slide == 0x%qx\n", self.slide);
         if (self.loadAddress || [self extractMainFunctionSymbolAddress])
         {
             if (self.mainFunctionSymbolAddress)
             {
-                printf("Main Symbol Address == 0x%x\n", self.mainFunctionSymbolAddress);
+                printf("Main Symbol Address == 0x%qx\n", self.mainFunctionSymbolAddress);
             }
 
             if (self.loadAddress || [self calculateLoadAddress])
             {
                 if (self.mainFunctionSymbolAddress)
                 {
-                    printf("Load Address == 0x%x\n", self.loadAddress);
+                    printf("Load Address == 0x%qx\n", self.loadAddress);
                 }
 
                 /*if*/ ([self calculateTargetSymbolAddress]);
                 {
-                    printf("Target Symbol Address == 0x%x\n", self.targetSymbolAddress);
+                    printf("Target Symbol Address == 0x%qx\n", self.targetSymbolAddress);
                     success = [self calculateTargetSymbol];
                 }
             }
@@ -224,7 +224,7 @@
 
 - (BOOL) extractSlide
 {
-    unsigned int slide = 0;
+    unsigned long long slide = 0;
     BOOL success = NO;
     
     @autoreleasepool {
@@ -304,7 +304,7 @@
 - (BOOL) calculateLoadAddress
 {
     BOOL success = NO;
-    unsigned int ld_address = self.mainFunctionStackAddress - self.mainFunctionSymbolAddress;
+    unsigned long long ld_address = self.mainFunctionStackAddress - self.mainFunctionSymbolAddress;
     if (ld_address > self.mainFunctionStackAddress)
     {
         fprintf(stderr, "main() stack address MUST be larger than the main() symbol address\n");
@@ -328,10 +328,10 @@
 - (BOOL) calculateTargetSymbolAddress
 {
     BOOL success = NO;
-    unsigned int func_symbol_address = self.targetStackAddress - self.loadAddress;
+    unsigned long long func_symbol_address = self.targetStackAddress - self.loadAddress;
     if (func_symbol_address > self.targetStackAddress)
     {
-        fprintf(stderr, "target stack address is too small for the calculated load address (0x%x)\n", self.loadAddress);
+        fprintf(stderr, "target stack address is too small for the calculated load address (0x%qx)\n", self.loadAddress);
     }
     else
     {
@@ -351,8 +351,8 @@
 
 - (BOOL) calculateTargetSymbol
 {
-    NSString* addy = [NSString stringWithFormat:@"0x%x", self.targetStackAddress];
-    NSString* addy2 = [NSString stringWithFormat:@"0x%x", (self.loadAddress ? self.loadAddress : self.slide)];
+    NSString* addy = [NSString stringWithFormat:@"0x%qx", self.targetStackAddress];
+    NSString* addy2 = [NSString stringWithFormat:@"0x%qx", (self.loadAddress ? self.loadAddress : self.slide)];
     NSString* output = [NSTask executeXcodeTool:@"atos" arguments:@[@"-arch", self.CPUArchitecture, @"-o", self.dSYMPath, (self.loadAddress ? @"-l" : @"-s"), addy2, addy]];
     NSArray* comp = [output componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
     output = comp.count > 0 ? [comp lastObject] : nil;

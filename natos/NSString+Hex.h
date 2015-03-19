@@ -9,5 +9,5 @@
 #import <Foundation/Foundation.h>
 
 @interface NSString (Hex)
-- (unsigned int) hexValue;
+- (unsigned long long) hexValue;
 @end
