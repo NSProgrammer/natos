@@ -234,7 +234,7 @@
         for (NSUInteger i = 0; i < lines.count && !success; i++)
         {
             NSString* line = [[lines objectAtIndex:i] stringByTrimmingCharactersInSet:whitespace];
-            if ([line isEqualToString:@"cmd LC_SEGMENT"])
+            if ([line isEqualToString:@"cmd LC_SEGMENT"] || [line isEqualToString:@"cmd LC_SEGMENT_64"])
             {
                 BOOL isText = NO;
                 for (NSUInteger j = 1; j+i < lines.count && j < 8 && !success; j++)
