@@ -9,11 +9,11 @@
 #import "NSString+Hex.h"
 
 @implementation NSString (Hex)
-- (unsigned int) hexValue
+- (unsigned long long) hexValue
 {
-    unsigned int value   = 0;
+    unsigned long long value   = 0;
     NSScanner*   scanner = [NSScanner scannerWithString:self];
-    [scanner scanHexInt:&value];
+    [scanner scanHexLongLong:&value];
     return value;
 }
 @end
